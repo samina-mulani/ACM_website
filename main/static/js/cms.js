@@ -1,5 +1,6 @@
 // xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
 document.onload = loadCMS();
+let csrf = document.getElementById("csrf").innerHTML;
 
 function loadCMS() {
 
@@ -56,6 +57,7 @@ function getAccordion(url) {
         url: url,
         data: {},
         success: function (data) {
+            console.log(url);
             let accordionContainer = document.querySelectorAll("#cms-main")[0];
             accordionContainer.innerHTML = "";
             let len = data.length;
@@ -70,8 +72,7 @@ function getAccordion(url) {
     });
 }
 
-var csrf = document.getElementById("csrf").innerHTML;
-// console.log(csrf);
+
 
 // YIKES.
 function createAccordion(accData, accordionIndex, url) {
@@ -84,16 +85,16 @@ function createAccordion(accData, accordionIndex, url) {
     let accordionTabName = document.createTextNode(accData.accordion_name);
     accordionTab.appendChild(accordionTabName);
 
-    
+
     let accordionControl = document.createElement('div');
     let deleteEle = document.createElement("span");
-    deleteEle.innerHTML = 'Delete'
+    // deleteEle.innerHTML = 'Delete'
     deleteEle.className = 'glyphicon glyphicon-trash';
     deleteEle.addEventListener('click', (e) => {
         deleteAccordion(e, accData.api_endpoint, url);
     });
     accordionControl.appendChild(deleteEle);
-
+    accordionControl.className += 'accordionControl';
 
     let plusSign = document.createElement("span");
     plusSign.className = 'accordion-plus-sign';
@@ -103,7 +104,6 @@ function createAccordion(accData, accordionIndex, url) {
 
 
     accordionTab.appendChild(accordionControl);
-    // accordionTab.setAttribute("onclick", "openAccordion(" + accordionIndex + ")");
     accordionTab.addEventListener('click', () => {
         openAccordion(accordionIndex);
     })
@@ -114,27 +114,38 @@ function createAccordion(accData, accordionIndex, url) {
     formPanel.className = "panel";
     for (let i = 0; i < formFields.length; i++) {
         let formRow = document.createElement("div");
-        let fieldName = document.createTextNode(formFields[i][0] + ": ");
-        formRow.appendChild(fieldName);
+        formRow.className += 'form-group';
+        let label = document.createElement('label');
+        let fieldName = document.createTextNode(formFields[i][0]);
+        label.appendChild(fieldName);
+        formRow.appendChild(label);
+
         if (formFields[i][1] == "text") {
             let fieldEditor = document.createElement("input");
             fieldEditor.setAttribute("type", formFields[i][1]);
             fieldEditor.setAttribute("value", accData[formFields[i][0]]);
+            fieldEditor.className += 'form-control';
             formRow.appendChild(fieldEditor);
+
         } else if (formFields[i][1] == "textarea") {
             let fieldEditor = document.createElement(formFields[i][1]);
             fieldEditor.innerHTML = accData[formFields[i][0]];
+            fieldEditor.className += 'form-control form-control-lg';
+            fieldEditor.rows = "5";
+            formRow.style.width = '100%';
             formRow.appendChild(fieldEditor);
+
         } else if (formFields[i][1] == "file") {
             let fieldEditor = document.createElement("input");
             fieldEditor.setAttribute("type", formFields[i][1]);
             fieldEditor.setAttribute("value", accData[formFields[i][0]]);
+            fieldEditor.className += 'form-control';
             formRow.appendChild(fieldEditor);
         }
         formPanel.appendChild(formRow);
     }
     let submitButton = document.createElement("button");
-
+    submitButton.className += 'btn btn-primary';
 
     submitButton.appendChild(document.createTextNode("Submit"));
     formPanel.appendChild(submitButton);
@@ -142,59 +153,43 @@ function createAccordion(accData, accordionIndex, url) {
     document.querySelectorAll(".panel > button")[accordionIndex].addEventListener("click", function () {
         let accordionForm = document.querySelectorAll(".panel > div > input");
         var currentField = document.querySelectorAll(".panel > button")[accordionIndex];
-        var currentData = new Object;        
+        var formData = new FormData;
 
+        /*
+            Populating the formData 'object' here, programatically
+        */
         let flen = formFields.length;
         for (let i = 0; i < flen; i++) {
             currentField = currentField.previousElementSibling;
 
             if (currentField.lastChild.type == "text") {
-                currentData[formFields[flen - i - 1][0]] = currentField.lastChild.value;
+                formData.append(formFields[flen - i - 1][0], currentField.lastChild.value);
 
             } else if (currentField.lastChild.type == 'textarea') {
-                currentData[formFields[flen - i - 1][0]] = $(currentField.lastChild).val();
+                formData.append(formFields[flen - i - 1][0], $(currentField.lastChild).val());
 
             } else if (currentField.lastChild.type == "file") {
-                
-                const imageData = new FormData;
-                imageData.append("image", currentField.lastChild.files[0]);
-                console.log(imageData['image']);
-                let data = $.ajax({
-                    type: 'POST',
-                    url: upload_url,
-                    data: imageData,
-                    headers: {
-                        "X-CSRFToken": csrf
-                    },
-                    contentType: false,
-                    processData: false,
-
-                    success: function (data) {
-                        alert("Posted the image")
-                        console.log("Posted the image")
-                    }
-                })
+                const imageFile = currentField.lastChild.files[0];
+                if (imageFile) {
+                    formData.append("description_image", currentField.lastChild.files[0]);
+                }
 
             } else {
-                currentData[formFields[flen - i - 1][0]] = currentField.lastChild.innerHTML;
-            } 
+                formData.append(formFields[flen - i - 1][0], currentField.lastChild.innerHTML);
+            }
         }
-
-        var json_data = JSON.stringify(currentData);
-        let data = $.ajax({
-            type: 'PUT',
-            url: accData.api_endpoint,
-            data: currentData,
+        // Send data to the UPDATE endpoint of the object (description/proftab) in question.
+        fetch(accData.api_endpoint, {
+            method: 'PUT',
             headers: {
                 "X-CSRFToken": csrf
             },
-            dataType: 'json',
+            body: formData
+        }).then((response) => {
+            alert('done');
+        })
 
-            success: function (data) {
-                alert("Success!")
-            }
-        });
-        console.log(accData)
+        
     });
 }
 
@@ -203,12 +198,10 @@ let isMenuOpen = false;
 function menuToggle() {
     if (isMenuOpen) {
         document.querySelectorAll(".side-bar")[0].style.transform = "translate(-105%)";
-        // document.querySelectorAll(".ham-menu")[0].src = "{% static 'media/img/menu.png' %}";
         document.querySelectorAll(".ham-menu")[0].style.transform = "rotate(-360deg)";
         isMenuOpen = false;
     } else {
         document.querySelectorAll(".side-bar")[0].style.transform = "translate(0)";
-        // document.querySelectorAll(".ham-menu")[0].src = "{% static 'media/img/cancel.png' %}";
         document.querySelectorAll(".ham-menu")[0].style.transform = "rotate(0)";
         isMenuOpen = true;
     }
@@ -225,8 +218,12 @@ function openAccordion(count) {
     }
 }
 
+function closeAccordion(count) {
+    document.querySelectorAll(".accordion .accordion-plus-sign")[count].innerHTML = "+";
+    document.querySelectorAll(".panel")[count].style.display = "none";
+}
+
 function deleteAccordion(e, api_endpoint, url) {
-    // console.log(e, api_endpoint);
     $.ajax({
         type: 'DELETE',
         url: api_endpoint,
@@ -235,7 +232,8 @@ function deleteAccordion(e, api_endpoint, url) {
         },
         success: function () {
             alert('Deleted Successfully');
-            getAccordion(url);
+            // getAccordion(url);
+            makeAccordions(url);
         }
     });
 }
@@ -251,27 +249,37 @@ function createAddAccordion(data, url) {
     formPanel.style.display = 'flex';
     for (let i = 0; i < formFields.length; i++) {
         let formRow = document.createElement("div");
+        formRow.className += 'form-group';
+        let label = document.createElement('label');
         let fieldName = document.createTextNode(formFields[i][0] + ": ");
-        formRow.appendChild(fieldName);
+        label.appendChild(fieldName);
+        formRow.appendChild(label);
+        
         if (formFields[i][1] == "text") {
             let fieldEditor = document.createElement("input");
             fieldEditor.setAttribute("type", formFields[i][1]);
             fieldEditor.setAttribute("value", '');
+            fieldEditor.className += 'form-control';
             formRow.appendChild(fieldEditor);
         } else if (formFields[i][1] == "textarea") {
             let fieldEditor = document.createElement(formFields[i][1]);
             fieldEditor.innerHTML = '';
+            fieldEditor.className += 'form-control form-control-lg';
+            fieldEditor.rows = "5";
+            formRow.style.width = '100%';
             formRow.appendChild(fieldEditor);
         } else if (formFields[i][1] == "file") {
             let fieldEditor = document.createElement("input");
             fieldEditor.setAttribute("type", formFields[i][1]);
             fieldEditor.setAttribute("value", '');
+            fieldEditor.className += 'form-control';
             formRow.appendChild(fieldEditor);
         }
         formPanel.appendChild(formRow);
     }
 
     let submitButton = document.createElement("button");
+    submitButton.className += 'btn btn-primary';
     submitButton.appendChild(document.createTextNode("Submit"));
     formPanel.appendChild(submitButton);
     formContainer.appendChild(formPanel);
@@ -291,7 +299,6 @@ function createAddAccordion(data, url) {
                 currentData[formFields[flen - i - 1][0]] = currentField.lastChild.innerHTML;
             }
         }
-        // currentData['csrfmiddlewaretoken'] = csrf;
 
         var json_data = JSON.stringify(currentData);
         console.log(JSON.parse(JSON.stringify(currentData)));

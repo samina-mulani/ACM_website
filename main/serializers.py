@@ -2,10 +2,6 @@ from .models import *
 from rest_framework import serializers
 
 class DescriptionSerializer(serializers.HyperlinkedModelSerializer):
-    accordion_name = serializers.SerializerMethodField()
-    form_fields = serializers.SerializerMethodField()
-    media_upload_url = serializers.SerializerMethodField()
-    api_endpoint = serializers.SerializerMethodField()
 
     class Meta:
         model = Description
@@ -18,47 +14,31 @@ class DescriptionSerializer(serializers.HyperlinkedModelSerializer):
             'description_image',
             'img_flag',
             'form_fields',
-            'media_upload_url',
             'embedded_url',
             'api_endpoint'
         )
 
-    def get_api_endpoint(self, obj):
-        page = obj.page
-        page_url = page.page_url
-        # print(self.kwargs['page_url'])
-        return "api/retrieve/description/" + str(obj.pk)
-
-    def get_form_fields(self, obj):
-        form_fields = []
-        if obj.description_title:
-            form_fields.append(['description_title', 'text'])
-        if obj.description_content:
-            form_fields.append(['description_content', 'textarea'])
-        if obj.description_readmore:
-            form_fields.append(['description_readmore', 'textarea'])
-        # if obj.description_image:
-        form_fields.append(['description_image', 'file'])
-        return form_fields
-
-    def get_accordion_name(self, obj):
-        if obj.description_title:
-            return obj.description_title
-        else:
-            return "Description Object"
-
-    def get_media_upload_url(self, obj):
-        string = '/media_upload/Description:' + str(obj.pk)
-        return string
 
     def create(self, validated_data):
-        params = self.context['request'].get_full_path().split("/") # parsing request url to get page and position lol
-        print(params)
+        params = self.context['request'].get_full_path().split("/") # parsing request url to get page and position
         page_url = params[4]
         position = params[5]
-        print(page_url)
         page = Page.objects.get(page_url=page_url)
+        print(validated_data)
         return Description.objects.create(page=page, position=position, **validated_data)
+
+
+    def update(self, instance, validated_data):
+        try:
+            instance.description_image = validated_data.get('description_image', instance.description_image)
+        except:
+            pass
+        instance.description_title = validated_data.get('description_title', instance.description_title)
+        instance.description_content = validated_data.get('description_content', instance.description_content)
+        instance.description_readmore = validated_data.get('description_readmore', instance.description_readmore)
+        instance.embedded_url = validated_data.get('embedded_url', instance.embedded_url)
+        instance.save()
+        return instance
 
 
 

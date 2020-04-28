@@ -21,33 +21,38 @@ import os
 import io
 import json
 
+
 def index(request):
     page_url = "/api/list/description/index"
-    return render(request, 'main/index.html', {'page_url': page_url})
+    return render(request, 'main/templates/index.html', {'page_url': page_url})
 
+
+@login_required(login_url='/sign_in')
 def render_cms_portal(request):
     return render(request, 'main/cms/cms.html')
 
-# Create your views here.
+
 class DescriptionViewSet(viewsets.ModelViewSet):
 
     serializer_class = DescriptionSerializer
-    # permission_classes = (DescriptionEditPerm,)
 
-    def get_queryset(self):  # Used with list method
+    # Get list of querysets filtered
+    # using url arguments
+    def get_queryset(self):
         page_url = self.kwargs['page_url']
         position = self.kwargs['position']
         page = Page.objects.get(page_url=page_url)
         if str(position) == "all":
             descriptions = Description.objects.filter(page=page)
         else:
-            descriptions = Description.objects.filter(page=page, position=position)
+            descriptions = Description.objects.filter(
+                page=page, position=position)
         return descriptions
 
-    def get_object(self):  # Used with retrieve method
+    # Get specific object
+    def get_object(self):
         pk = int(self.kwargs['pk'])
         description = Description.objects.get(pk=pk)
-        # self.check_object_permissions(self.request, description)
         return description
 
 
@@ -83,6 +88,7 @@ def sign_in(request):
         return render(request, 'main/cms/sign_in.html')
 
 
+@login_required
 def get_cms_permission_data(request):
     if request.user.level == 1:
         current_prof = Professor.objects.get(user=request.user)
@@ -117,18 +123,21 @@ def get_cms_permission_data(request):
     return JsonResponse({'page_list': page_list, 'fixed_fields': fixed_fields})
 
 
+
 def get_template_classes(request, template_code):
     if template_code == 1:
         # Return list of classes
         pass
     # So on.
 
+
 def render_page(request, page_url):
-    # page = Page.objects.get(page_url=page_url)
-    # html_template = page.template
-    html_template_path = 'main/templates/' + str(page_url) +'.html'
+    page = Page.objects.get(page_url=page_url)
+    html_template = page.template
+    html_template_path = 'main/templates/' + html_template + '.html'
     page_url = '/api/list/description/' + page_url + '/all'
     return render(request, html_template_path, {'page_url': page_url})
+
 
 def get_page_list(request):
     # you can check permissions before sending list here.
@@ -142,7 +151,6 @@ def get_page_list(request):
     return JsonResponse({"pages": page_list})
 
 
-
 def get_page_data_list(request, key):
     page = Page.objects.get(page_id=key)
     template_code = int(page.template)
@@ -150,16 +158,30 @@ def get_page_data_list(request, key):
     return JsonResponse({"template_classes": template_classes})
 
 
+@login_required
+def create_page(request):
+    page_url = str(request.POST.get("page_url"))
+    page_id = str(request.POST.get("page_id"))
+    page_description = str(request.POST.get("page_description"))
+    template = request.POST.get("template")
+
+    Page.objects.create(page_url=page_url, page_id=page_id,
+                        page_description=page_description, template=template)
+
+    return JsonResponse({}, status=201)
+    
+
+
 # AFAIK, This is ugly but a lot more optimized
 # than it's alternatives.
-def media_upload(request, upload_string):
-    params = upload_string.split(':')
-    model = apps.get_model(app_label = "main", model_name = str(params[0]))
-    model_instance = model.objects.get(pk = int(params[1]))
-    
-    image = request.FILES.get("image")
-    model_instance.description_image = image
-    model_instance.save()
-    print(model_instance)
+# def media_upload(request, upload_string):
+#     params = upload_string.split(':')
+#     model = apps.get_model(app_label = "main", model_name = str(params[0]))
+#     model_instance = model.objects.get(pk = int(params[1]))
 
-    return HttpResponse(status=200)
+#     image = request.FILES.get("image")
+#     model_instance.description_image = image
+#     model_instance.save()
+#     print(model_instance)
+
+#     return HttpResponse(status=200)
